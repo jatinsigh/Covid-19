@@ -1,119 +1,188 @@
-import tensorflow as tf
-import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
-
-df=pd.read_excel(r'C:\Users\Jatin Singh\Desktop\confirm_india.xlsx')
-
-def plot_series(time,series,start=0,end=None,format='-'):
-    plt.plot(time[start:end],series[start:end],format)
-    plt.xlabel('Time')
-    plt.ylabel('Series')
-    plt.grid=True
-
-df=df.dropna()
-df.shape
-
-df.head()
-
-series=df['Confirm']
-Time=pd.to_datetime(df['Dates'])
-time=np.arange(305)
-plt.plot(time,series)
-
-import plotly
+import matplotlib.pyplot as plt
+%matplotlib inline 
+import seaborn as sns
 import plotly.express as px
 import plotly.graph_objects as go
 
+#How to read data from excel file
+df=pd.read_excel(r'C:\Users\Jatin Singh\Desktop\covid 19\summarised data.xlsx')
+df_india=df.copy()
+df
+
+#df.drop(columns=('S.NO'),axis=1,inplace=True)
+df['Total cases']=df['Confirmed']
+total_cases=df['Total cases'].sum()
+print(total_cases)
+#df['Total cases']
+
+df.style.background_gradient(cmap='Blues')
+
+df['Total Active']=df['Total cases']-df['Deaths']-df['Recovered']
+total_active=df['Total Active'].sum()
+print(total_active)
+tot_cases=df.groupby('State / UT')['Total Active'].sum().sort_values(ascending=False).to_frame()
+tot_cases.style.background_gradient(cmap='Blues')
+
+
+df_Full=df
+f, ax=plt.subplots(figsize=(12,8))
+data=df_Full[['State / UT','Total cases','Recovered','Deaths']]
+data.sort_values('Total cases', ascending=False,inplace=True)
+sns.set_color_codes('pastel')
+sns.barplot(x='Total cases',y='State / UT',data=data,label='Total',color='r')
+
+sns.set_color_codes('muted')
+sns.barplot(x='Recovered',y='State / UT',data=data,label='Recovered',color='g')
+
+ax.legend(ncol=2,loc="lower left", frameon=True)
+ax.set(xlim=(0,45000), ylabel="States / UT",xlabel="Cases")
+sns.despine(left=True,bottom=True)
+
+dbd_India=pd.read_excel(r'C:\Users\Jatin Singh\Desktop\CONFIRMED CASE.xlsx')
+dbd_india=dbd_India.copy()
+#dbd_India.tail()
+#import plotly
+#plotly.io.renderers.default='colab'
+dbd_India.shape
+
+import plotly
 plotly.io.renderers.default = 'notebook' 
 #dbd_India['Total cases']=df['Total cases']
 fig=go.Figure()
-fig.add_trace(go.Scatter(x=time, y=series, mode='lines+markers',name='Total Cases'))#,line=dict(shape='spline')))
+fig.add_trace(go.Scatter(x=dbd_India['DATE'], y=dbd_India['Total Cases'], mode='lines+markers',name='Total Cases'))#,line=dict(shape='spline')))
 fig.update_layout(title_text='Trend of coronavirus cases in India(Cumulative cases)',plot_bgcolor='rgb(230,230,230)')
 fig.show()
 
-split_time = 300
-time_train = time[:split_time]
-x_train = series[:split_time]
-time_valid = time[split_time:]
-x_valid = series[split_time:]
+import plotly.express as px
+fig=px.bar(dbd_India, x="DATE", y="New Cases", barmode='group',height=400)
+fig.update_layout(title_text='coronaovirus cases per day', plot_bgcolor='rgb(230,230,230)')
+fig.show()
 
-batch_size=32
-window_size=20
-shuffle_buffer_size=300
+from fbprophet import Prophet
+#df=pd.read_csv(r'C:\Users\Jatin Singh\Desktop\clean_complete.csv')
+df_confirmed=pd.read_excel(r'C:\Users\Jatin Singh\Desktop\2confirmed.xlsx')
+df_death=pd.read_excel(r'C:\Users\Jatin Singh\Desktop\2deceased.xlsx')
+df_recovered=pd.read_excel(r'C:\Users\Jatin Singh\Desktop\2recovered.xlsx')
+#df_confirmed.rename(columns={'Country/Region':'Country'},inplace=True)
+#df_death.rename(columns={'Country/Region':'Country'},inplace=True)
+#df_recovered.rename(columns={'Country/Region':'Country'},inplace=True)
+df_confirmed.head()
 
-def windowed_size(series,window_size,batch_size,shuffle_buffer):
-    dataset=tf.data.Dataset.from_tensor_slices(series)
-    dataset=dataset.window(window_size+1,shift=1,drop_remainder=True)
-    dataset=dataset.flat_map(lambda window:window.batch(window_size+1))
-    dataset=dataset.shuffle(shuffle_buffer).map(lambda window:(window[:-1],window[-1:]))
-    dataset=dataset.batch(batch_size).prefetch(1)
-    return dataset
+#grouping the dataset by date
+df=pd.read_excel(r'C:\Users\Jatin Singh\Desktop\clean_complete.xlsx')
+confirmed1=df.groupby('DATE').sum()['Confirmed'].reset_index()
+deaths1=df.groupby('DATE').sum()['Deaths'].reset_index()
+recovered1=df.groupby('DATE').sum()['Recovered'].reset_index()
+#confirmed1
 
-def model_forecast(model, series, window_size):
-    ds = tf.data.Dataset.from_tensor_slices(series)
-    ds = ds.window(window_size, shift=1, drop_remainder=True)
-    ds = ds.flat_map(lambda w: w.batch(window_size))
-    ds = ds.batch(32).prefetch(1)
-    forecast = model.predict(ds)
-    return forecast
+fig=go.Figure()
+#plotting date wise confirmed cases
+fig.add_trace(go.Scatter(x=confirmed1['DATE'], y=confirmed1['Confirmed'], mode='lines+markers',name='Confirmed',line=dict(shape='spline')))
+fig.add_trace(go.Scatter(x=deaths1['DATE'], y=deaths1['Deaths'], mode='lines+markers',name='Deaths',line=dict(shape='spline')))
+fig.add_trace(go.Scatter(x=recovered1['DATE'], y=recovered1['Recovered'], mode='lines+markers',name='Recovered',line=dict(shape='spline')))
+fig.update_layout(title='India Data of covid-19', xaxis_tickfont_size=14,yaxis=dict(title='Number of cases'))
+fig.show()
 
-tf.keras.backend.clear_session()
-tf.random.set_seed(51)
-np.random.seed(51)
+from fbprophet import Prophet
 
-train_set=windowed_size(series,window_size,batch_size=128,shuffle_buffer=shuffle_buffer_size)
+#grouping the dataset by date
+confirmed=pd.read_excel(r'C:\Users\Jatin Singh\Desktop\2confirmed.xlsx')
+deaths=pd.read_excel(r'C:\Users\Jatin Singh\Desktop\2deceased.xlsx')
+recovered=pd.read_excel(r'C:\Users\Jatin Singh\Desktop\2recovered.xlsx')
 
-model=tf.keras.models.Sequential([
-    tf.keras.layers.Lambda(lambda x:tf.expand_dims(x,axis=-1),input_shape=[None]),
-    tf.keras.layers.SimpleRNN(60,return_sequences=True),
-    tf.keras.layers.SimpleRNN(60,return_sequences=True),
-    tf.keras.layers.SimpleRNN(60,return_sequences=True),
-    tf.keras.layers.SimpleRNN(60),
-    tf.keras.layers.Dense(1),
-    tf.keras.layers.Lambda(lambda x:x*100.0)
-])
+#confirmed=df.groupby('Date').sum()['Confirmed'].reset_index()
+#deaths=df.groupby('Date').sum()['Deaths'].reset_index()
+#recovered=df.groupby('Date').sum()['Recovered'].reset_index()
+#confirmed
 
-lr_schedule=tf.keras.callbacks.LearningRateScheduler(lambda epoch:1e-8 * 10 **(epoch/20))
-optimizers=tf.keras.optimizers.SGD(lr=1e-8,momentum=0.9)
-
-model.compile(loss=tf.keras.losses.Huber(),optimizer=optimizers,metrics=["mae"])
-history=model.fit(train_set,epochs=300,callbacks=[lr_schedule])
-
-plt.semilogx(history.history['lr'],history.history['loss'])
-#plt.axis([1e-8,1e-4,0,30])
-
-epochs=range(len(history.history['loss']))
-plt.plot(epochs,history.history['loss'])
-
-tf.keras.backend.clear_session()
-tf.random.set_seed(51)
-np.random.seed(51)
-
-dataset=windowed_size(series,window_size,batch_size,shuffle_buffer_size)
-
-model=tf.keras.models.Sequential([
-    tf.keras.layers.Lambda(lambda x:tf.expand_dims(x,axis=-1),input_shape=[None]),
-    tf.keras.layers.SimpleRNN(60,return_sequences=True),
-    tf.keras.layers.SimpleRNN(60,return_sequences=True),
-    tf.keras.layers.SimpleRNN(60,return_sequences=True),
-    tf.keras.layers.SimpleRNN(60),
-    tf.keras.layers.Dense(1),
-    tf.keras.layers.Lambda(lambda x:x*100.0)
-])
-
-optimizer=tf.keras.optimizers.SGD(lr=0.1,momentum=0.9)
-model.compile(loss=tf.keras.losses.Huber(),optimizer=optimizer,metrics='mae')
-history=model.fit(dataset,epochs=400)
-
-rnn_forecast = model_forecast(model, series[..., np.newaxis], window_size)
-rnn_forecast = rnn_forecast[split_time - window_size:-1, -1]
+#grouping the dataset by date
+confirmed1=df.groupby('DATE').sum()['Confirmed'].reset_index()
+deaths1=df.groupby('DATE').sum()['Deaths'].reset_index()
+recovered1=df.groupby('DATE').sum()['Recovered'].reset_index()
 
 
+confirmed1.tail()
 
-plt.figure(figsize=(10, 6))
-plot_series(time_valid, x_valid)
-plot_series(time_valid, rnn_forecast)
+confirmTrain=confirmed1[0:67]
+confirmTest=confirmed1[68:74]
+#confirmTrain
+confirmTest
 
-tf.keras.metrics.mean_absolute_error(x_valid, rnn_forecast).numpy()
+confirmTrain.columns=['ds','y']
+confirmTrain['ds']=pd.to_datetime(confirmTrain['ds'])
+
+#Forecasting the confirmed data using prophet
+m=Prophet(interval_width=0.95)
+m.fit(confirmTrain)
+future=m.make_future_dataframe(periods=7)
+future.tail()
+
+#predicting the output y and the range in which output can occur
+forecast=m.predict(future)
+forecast[['ds','yhat','yhat_lower','yhat_upper']].tail()
+confirmPredict=forecast.iloc[68:74,[0,2]]
+print(confirmTest)#.iloc#[:,1]#,confirmTest.iloc[:,1])
+
+import tensorflow as tf
+x=tf.Variable(confirmPredict.iloc[:,[1]],tf.float32)
+y=tf.Variable(confirmTest.iloc[1,[1]],tf.float32)
+square_delta=tf.square(x-y)
+loss=tf.reduce_sum(x-y)
+init=tf.global_variables_initializer()
+sess=tf.Session()
+sess.run(init)
+print(sess.run(loss))
+
+fig=go.Figure()
+confirmed_forecast_plot=m.plot(forecast)
+fig=confirmed_forecast_plot
+#fig.add_trace(go.Scatter(x=confirmTest['DATE'], y=confirmTest['Confirmed'], mode='markers'))#,line=dict(shape='spline')))
+
+
+confirmed_forecast_plot=m.plot_components(forecast)
+
+deaths prediction
+
+deaths1.columns=['ds','y']
+deaths1['ds']=pd.to_datetime(deaths1['ds'])
+
+
+deaths1.tail()
+
+#Forecasting the confirmed data using prophet
+m=Prophet(interval_width=0.95)
+m.fit(deaths1)
+future=m.make_future_dataframe(periods=14)
+future.tail()
+
+#predicting the output y and the range in which output can occur
+forecast=m.predict(future)
+forecast[['ds','yhat','yhat_lower','yhat_upper']].tail()
+
+deaths_forecast_plot=m.plot(forecast)
+
+deaths_forecast_plot=m.plot_components(forecast)
+
+#Recovered
+
+recovered1.columns=['ds','y']
+recovered1['ds']=pd.to_datetime(recovered1['ds'])
+
+
+recovered1.tail()
+
+#Forecasting the confirmed data using prophet
+m=Prophet(interval_width=0.95)
+m.fit(recovered1)
+future=m.make_future_dataframe(periods=14)
+future.tail()
+
+#predicting the output y and the range in which output can occur
+forecast=m.predict(future)
+forecast[['ds','yhat','yhat_lower','yhat_upper']].tail()
+
+recovered_forecast_plot=m.plot(forecast)
+
+recovered_forecast_plot=m.plot_components(forecast)
 
